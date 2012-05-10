@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
-import sys, os, dicom, wx
+import sys, os, dicom, wx, resources
+
+res = resources.Resources()
 
 class BaseFrame(wx.Frame):
     def __init__(self):
@@ -65,7 +67,6 @@ class FileSelection(wx.Panel):
         self.container.Add(self.hboxB)
         self.container.Add(self.line2)
         
-        
         self.vboxA1.Add(self.sourceTxt)
         self.vboxA1.Add(self.sourceTxtCtrl)
         self.vboxA1.Add(self.targetTxt)
@@ -83,18 +84,46 @@ class FileSelection(wx.Panel):
         self.hboxB.AddSpacer((25,1))
         self.hboxB.Add(self.helpBtn, 0, wx.TOP, 5)
         
+        # Bindings
+        self.sourceBtn.Bind(wx.EVT_BUTTON, self.setSource)
+        self.targetBtn.Bind(wx.EVT_BUTTON, self.setTarget)
+        self.helpBtn.Bind(wx.EVT_BUTTON, self.help)
+        self.mapBtn.Bind(wx.EVT_BUTTON, self.mapper)
+        self.loadBtn.Bind(wx.EVT_BUTTON, self.loadMap)
+        self.saveBtn.Bind(wx.EVT_BUTTON, self.saveMap)
+        
         # Initialization
         self.SetSizer(self.container)
         
         self.Centre()
         
+    # Handlers    
+    def setSource(self, event):
+        print "Source Button"
+        
+    def setTarget(self, event):
+        print "Target Button"
+        
+    def help(self, event):
+        print "Help Button"
+        
+    def mapper(self, event):
+        print "Map Button"
+    
+    def loadMap(self, event):
+        print "Load Button"
+        
+    def saveMap(self, event):
+        print "Save Button"
         
 class EditTags(wx.Panel):
+    
+    checkedTags = {}
+    
     def __init__(self, parent):
         wx.Panel.__init__(self, parent)
         
         baseFrame       = parent
-        self.tagGroups  = ["One", "Two", "Three"]
         
         # Sizers
         self.container  = wx.BoxSizer(wx.VERTICAL)
@@ -113,11 +142,11 @@ class EditTags(wx.Panel):
         self.privateCheck   = wx.CheckBox(self, 0, "Remove Private Tags")
         
         # Combo
-        self.tagDrop        = wx.ComboBox(self, 0, size=(790, 25), choices=self.tagGroups, style=wx.CB_READONLY)
+        self.tagDrop        = wx.ComboBox(self, 0, size=(790, 25), choices=res.tagGroups, style=wx.CB_READONLY)
         self.patientDrop    = wx.ComboBox(self, 0, size=(600, 25), choices=['Patients List'], style=wx.CB_READONLY)
         
         # Check List Box
-        self.tagCLBox   = wx.CheckListBox(self, 0, size=(395,255), choices=[], style=0)
+        self.tagCLBox   = wx.CheckListBox(self, 0, size=(395,255), choices=["1", "2", "3"], style=0)
         
         # Text Ctrl
         self.editTc = wx.TextCtrl(self, 0, 'Input field for new Tag value', size=(600,25))
@@ -153,10 +182,34 @@ class EditTags(wx.Panel):
         self.hboxC1.Add(self.editTc)
         self.hboxC1.Add(self.editBtn, 0, wx.LEFT, 5)
         
+        # Bindings
+        self.removeBtn.Bind(wx.EVT_BUTTON, self.removeEdit)
+        self.editBtn.Bind(wx.EVT_BUTTON, self.editTag)
+        self.tagCLBox.Bind(wx.EVT_CHECKLISTBOX, self.checkTag)
+        self.tagCLBox.Bind(wx.EVT_LISTBOX, self.checkTag)
+        
         # Initialization
         self.SetSizer(self.container)
         
         self.Centre()
+        
+    # Handlers
+    def removeEdit(self, event):
+        print "Remove Button"
+        
+    def editTag(self, event):
+        print "Edit Button"
+        
+    def checkTag(self, event):
+        self.id     = event.GetSelection()
+        self.tag    = self.tagCLBox.GetString(self.id)
+        
+        if self.tagCLBox.IsChecked(self.id):
+            self.tagCLBox.Check(self.id, 0)
+            del EditTags.checkedTags[self.tag]
+        else:
+            self.tagCLBox.Check(self.id)
+            EditTags.checkedTags[self.tag] = ''
         
 class AddTags(wx.Panel):
     def __init__(self, parent):
@@ -199,11 +252,42 @@ class AddTags(wx.Panel):
         self.vboxB.Add(self.processBtn)
         self.vboxB.Add(self.batchBtn)
         
+        # Bindings
+        self.addBtn.Bind(wx.EVT_BUTTON, self.addComment)
+        self.removeBtn.Bind(wx.EVT_BUTTON, self.removeComment)
+        self.processBtn.Bind(wx.EVT_BUTTON, self.process)
+        self.batchBtn.Bind(wx.EVT_BUTTON, self.batchProcess)
+        
         # Initialization
         self.SetSizer(self.container)
         
         self.Centre()
         
+    # Handlers
+    def addComment(self, event):
+        print "Add Button"
+        
+    def removeComment(self, event):
+        print "Remove Button"
+        
+    def process(self, event):
+        print "Process Button"
+        
+    def batchProcess(self, event):
+        for i in res.tagGroups:
+            print i
+        
+def throwError(message, title='Error', parent=None):
+    dlg = wx.MessageDialog(parent, message, title, wx.OK | wx.ICON_ERROR)
+    dlg.CenterOnParent()
+    dlg.ShowModal()
+    dlg.Destroy()
+    
+def isDicom(filename):
+    try:
+        return dicom.read_file(filename) 
+    except dicom.filereader.InvalidDicomError:
+        return False
 
 if __name__ == "__main__":
     app = wx.App(0)
