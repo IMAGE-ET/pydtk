@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
-import sys, os, dicom, wx, resources
+import sys, os, dicom, wx, resources, logic, _dicom_dict
 
 res = resources.Resources()
+#logic = logic.Logic()
 
 class BaseFrame(wx.Frame):
     def __init__(self):
@@ -27,6 +28,10 @@ class BaseFrame(wx.Frame):
         self.Centre()
         
 class FileSelection(wx.Panel):
+    
+    sPath = ""
+    tPath = ""
+    
     def __init__(self, parent):
         wx.Panel.__init__(self, parent, size=(800,200))
         
@@ -99,13 +104,26 @@ class FileSelection(wx.Panel):
         
     # Handlers    
     def setSource(self, event):
-        print "Source Button"
+        self.filePrompt = wx.DirDialog(self, "Choose the Source Directory:", style=wx.DD_DEFAULT_STYLE)
+        
+        if self.filePrompt.ShowModal() == wx.ID_OK:
+            FileSelection.sPath = self.filePrompt.GetPath() + '/'
+            self.sourceTxtCtrl.SetValue(FileSelection.sPath)
+            
+        self.filePrompt.Destroy()
         
     def setTarget(self, event):
-        print "Target Button"
+        self.filePrompt = wx.DirDialog(self, "Choose the Target Directory:", style=wx.DD_DEFAULT_STYLE)
+        
+        if self.filePrompt.ShowModal() == wx.ID_OK:
+            FileSelection.tPath = self.filePrompt.GetPath() + '/'
+            self.targetTxtCtrl.SetValue(FileSelection.tPath)
+        
+        self.filePrompt.Destroy()
         
     def help(self, event):
-        print "Help Button"
+        for e in _dicom_dict.DicomDictionary.items():
+            print e
         
     def mapper(self, event):
         print "Map Button"
@@ -118,10 +136,14 @@ class FileSelection(wx.Panel):
         
 class EditTags(wx.Panel):
     
+    tagSet      = {}
     checkedTags = {}
+    tagList     = []
+    currentTags = []
     
     def __init__(self, parent):
         wx.Panel.__init__(self, parent)
+        global baseTags
         
         baseFrame       = parent
         
@@ -135,7 +157,6 @@ class EditTags(wx.Panel):
         self.hboxC1     = wx.BoxSizer(wx.HORIZONTAL)
         
         # Buttons
-        self.removeBtn  = wx.Button(self, 0, "Remove Edit", size=(395,25))
         self.editBtn    = wx.Button(self, 0, "Edit Tag", size=(185,25))
         
         # Checkbox
@@ -146,14 +167,14 @@ class EditTags(wx.Panel):
         self.patientDrop    = wx.ComboBox(self, 0, size=(600, 25), choices=['Patients List'], style=wx.CB_READONLY)
         
         # Check List Box
-        self.tagCLBox   = wx.CheckListBox(self, 0, size=(395,255), choices=["1", "2", "3"], style=0)
+        self.tagCLBox   = wx.CheckListBox(self, 0, size=(395,255), choices=sorted(EditTags.tagList), style=0)
         
         # Text Ctrl
         self.editTc = wx.TextCtrl(self, 0, 'Input field for new Tag value', size=(600,25))
         self.tagTc  = wx.TextCtrl(self, 0, 'Select a Tag to edit it', size=(790,25), style=wx.TE_READONLY)
         
         # List Box
-        self.changesLBox    = wx.ListBox(self, 0, size=(395,230), style=wx.TE_MULTILINE)
+        self.changesLBox    = wx.ListBox(self, 0, size=(395,255), style=wx.TE_MULTILINE)
         
         # Line
         self.line1  = wx.StaticLine(self, 0, size=(800,1))
@@ -174,7 +195,6 @@ class EditTags(wx.Panel):
         self.hboxB.Add(self.tagCLBox)
         self.hboxB.Add(self.vboxB1)
         self.vboxB1.Add(self.changesLBox)
-        self.vboxB1.Add(self.removeBtn)
         
         self.vboxC.Add(self.tagTc)
         self.vboxC.AddSpacer((1,5))
@@ -183,20 +203,20 @@ class EditTags(wx.Panel):
         self.hboxC1.Add(self.editBtn, 0, wx.LEFT, 5)
         
         # Bindings
-        self.removeBtn.Bind(wx.EVT_BUTTON, self.removeEdit)
         self.editBtn.Bind(wx.EVT_BUTTON, self.editTag)
         self.tagCLBox.Bind(wx.EVT_CHECKLISTBOX, self.checkTag)
         self.tagCLBox.Bind(wx.EVT_LISTBOX, self.checkTag)
+        self.tagDrop.Bind(wx.EVT_COMBOBOX, self.setTagGroup)
+        self.patientDrop.Bind(wx.EVT_COMBOBOX, self.setPatient)
         
         # Initialization
         self.SetSizer(self.container)
-        
         self.Centre()
+        self.tagDrop.SetValue('0010 : Patient Information')
+        self.patientDrop.SetValue('Patients List')
+        
         
     # Handlers
-    def removeEdit(self, event):
-        print "Remove Button"
-        
     def editTag(self, event):
         print "Edit Button"
         
@@ -210,6 +230,25 @@ class EditTags(wx.Panel):
         else:
             self.tagCLBox.Check(self.id)
             EditTags.checkedTags[self.tag] = ''
+            
+    def setTagGroup(self, event):
+        self.group      = self.tagDrop.GetValue()[:4]
+        self.checked    = self.tagCLBox.GetChecked()
+        
+        EditTags.tagList = []
+        
+        self.tagCLBox.Clear()
+        
+        for tag in _dicom_dict.DicomDictionary.items():
+            groupID = tag[0][2:6]
+            if groupID == self.group:
+                EditTags.tagList.append(tag[1][2])
+        
+        self.tagCLBox.InsertItems(items=sorted(EditTags.tagList), pos=0)
+        
+        
+    def setPatient(self, event):
+        pass
         
 class AddTags(wx.Panel):
     def __init__(self, parent):
@@ -288,10 +327,17 @@ def isDicom(filename):
         return dicom.read_file(filename) 
     except dicom.filereader.InvalidDicomError:
         return False
-
+    
 if __name__ == "__main__":
+    
+    for tag in _dicom_dict.DicomDictionary.items():
+        groupID = tag[0][2:6]
+        if groupID == "0010":
+            print tag[1][2]
+            EditTags.tagList.append(tag[1][2])
+    
     app = wx.App(0)
     main = BaseFrame()
-    
     main.Show()
     app.MainLoop()
+    
