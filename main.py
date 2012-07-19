@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-import sys, os, dicom, wx, resources, logic, _dicom_dict
+import sys, os, dicom, wx, resources, logic
 
 res = resources.Resources()
-#logic = logic.Logic()
+logic = logic.Logic()
 
 class BaseFrame(wx.Frame):
     def __init__(self):
@@ -29,8 +29,8 @@ class BaseFrame(wx.Frame):
         
 class FileSelection(wx.Panel):
     
-    sPath = ""
-    tPath = ""
+    sPath = "/Users/jxu1/Documents/DICOM/dump/1/109-004/"
+    tPath = "/Users/jxu1/Documents/DICOM/dump2/"
     
     def __init__(self, parent):
         wx.Panel.__init__(self, parent, size=(800,200))
@@ -38,31 +38,34 @@ class FileSelection(wx.Panel):
         baseFrame = parent
         
         # Sizers
-        self.container  = wx.BoxSizer(wx.VERTICAL)
-        self.hboxA      = wx.BoxSizer(wx.HORIZONTAL)
-        self.vboxA1     = wx.BoxSizer(wx.VERTICAL)
-        self.vboxA2     = wx.BoxSizer(wx.VERTICAL)
-        self.hboxB      = wx.BoxSizer(wx.HORIZONTAL)
+        self.container = wx.BoxSizer(wx.VERTICAL)
+        self.hboxA = wx.BoxSizer(wx.HORIZONTAL)
+        self.vboxA1 = wx.BoxSizer(wx.VERTICAL)
+        self.vboxA2 = wx.BoxSizer(wx.VERTICAL)
+        self.hboxB = wx.BoxSizer(wx.HORIZONTAL)
         
         # Static Text
-        self.sourceTxt  = wx.StaticText(self, 0, "Source Directory :")
-        self.targetTxt  = wx.StaticText(self, 0, "Target Directory :")
+        self.sourceTxt = wx.StaticText(self, 0, "Source Directory :")
+        self.targetTxt = wx.StaticText(self, 0, "Target Directory :")
         
         # Text Control
-        self.sourceTxtCtrl  = wx.TextCtrl(self, 0, "", size=(600,25))
-        self.targetTxtCtrl  = wx.TextCtrl(self, 0, "", size=(600,25))
+        self.sourceTxtCtrl = wx.TextCtrl(self, 0, "", size=(600,25))
+        self.targetTxtCtrl = wx.TextCtrl(self, 0, "", size=(600,25))
         
         # Buttons
-        self.sourceBtn  = wx.Button(self, 0, "Select Source", size=(150,25))
-        self.targetBtn  = wx.Button(self, 0, "Select Target", size=(150,25))
-        self.helpBtn    = wx.Button(self, 0, "User's Guide", size=(150,25))
-        self.mapBtn     = wx.Button(self, 0, "Map", size=(200,25))
-        self.loadBtn    = wx.Button(self, 0, "Load Map", size=(200,25))
-        self.saveBtn    = wx.Button(self, 0, "Save Map", size=(200,25))
+        self.sourceBtn = wx.Button(self, 0, "Select Source", size=(150,25))
+        self.targetBtn = wx.Button(self, 0, "Select Target", size=(150,25))
+        self.helpBtn = wx.Button(self, 0, "User's Guide", size=(150,25))
+        self.mapBtn = wx.Button(self, 0, "Map", size=(200,25))
+        self.loadBtn = wx.Button(self, 0, "Load Map", size=(200,25))
+        self.saveBtn = wx.Button(self, 0, "Save Map", size=(200,25))
         
         # Line
-        self.line1  = wx.StaticLine(self, 0, size=(800,1))
-        self.line2  = wx.StaticLine(self, 0, size=(800,1))
+        self.line1 = wx.StaticLine(self, 0, size=(800,1))
+        self.line2 = wx.StaticLine(self, 0, size=(800,1))
+        
+        # Dialog
+        self.missingName = wx.MessageDialog(self, 'There were files without a Patient\'s Name, please check the runlog.txt for more information', 'Notice!', wx.OK | wx.ICON_INFORMATION)
         
         # Layout
         self.container.Add(self.hboxA)
@@ -122,11 +125,39 @@ class FileSelection(wx.Panel):
         self.filePrompt.Destroy()
         
     def help(self, event):
-        for e in _dicom_dict.DicomDictionary.items():
+        for e in res.DicomDictionary.items():
             print e
         
     def mapper(self, event):
-        print "Map Button"
+        self.flaggedFiles = []
+        self.missingName = False
+        
+        for dirname, dirs, files, in os.walk(FileSelection.sPath):
+            for filename in files:
+                fPath = dirname + '/' + filename
+                path = dirname.split("/")
+                if isDicom(fPath):
+                    ds = dicom.read_file(fPath)
+                    if ds.PatientsName == "":
+                        self.flaggedFiles.append(fPath)
+                        self.missingName = True
+                    else:
+                        logic.getPatients(self, ds)
+                        
+        if self.missingName:
+            timeStamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+            logName = "logs/log_" + timeStamp + ".txt"
+            errorFile = open(logName, 'wb')
+            errorFile.write("The following files are flagged for not having a Patient\'s Name:\n")
+                
+            for filename in self.flaggedFiles:
+                errorFile.write(filename + "\n")
+                
+            self.missingName.ShowModal()
+            self.missingName.Destroy()
+                        
+        logic.genMap(self)
+        
     
     def loadMap(self, event):
         print "Load Button"
@@ -136,7 +167,7 @@ class FileSelection(wx.Panel):
         
 class EditTags(wx.Panel):
     
-    tagSet      = {}
+    patients    = {}
     checkedTags = {}
     tagList     = []
     currentTags = []
@@ -269,7 +300,7 @@ class AddTags(wx.Panel):
         self.batchBtn   = wx.Button(self, 0, "Batch Process", size=(150,25))
         
         # Text Ctrl
-        self.addTc  = wx.TextCtrl(self, 0, 'Input field for adding Comments', size=(600,25))
+        self.addTc      = wx.TextCtrl(self, 0, 'Input field for adding Comments', size=(596,25))
 
         # List Box
         self.commentLBox    = wx.ListBox(self, 0, size=(600,135), style=wx.TE_MULTILINE)
@@ -281,13 +312,13 @@ class AddTags(wx.Panel):
         
         self.vboxA.Add(self.commentLBox)
         self.vboxA.AddSpacer((1,2))
-        self.vboxA.Add(self.addTc)
+        self.vboxA.Add(self.addTc, 0, wx.LEFT, 2)
         self.vboxA.AddSpacer((1,5))
         self.vboxA.Add(self.hboxA1)
         self.hboxA1.Add(self.addBtn)
         self.hboxA1.Add(self.removeBtn)
         
-        self.vboxB.AddSpacer((1,147))
+        self.vboxB.AddSpacer((1,148))
         self.vboxB.Add(self.processBtn)
         self.vboxB.Add(self.batchBtn)
         
@@ -313,14 +344,29 @@ class AddTags(wx.Panel):
         print "Process Button"
         
     def batchProcess(self, event):
-        for i in res.tagGroups:
-            print i
+        redir = RedirectText(self.addTc)
+        for i in res.DicomDictionary.keys():
+            sys.stdout = redir
+            Printer(i)
         
-def throwError(message, title='Error', parent=None):
+def Error(message, title='Error', parent=None):
     dlg = wx.MessageDialog(parent, message, title, wx.OK | wx.ICON_ERROR)
     dlg.CenterOnParent()
     dlg.ShowModal()
     dlg.Destroy()
+    
+
+class RedirectText:
+    def __init__(self, aWxTextCtrl):
+        self.out = aWxTextCtrl
+
+    def write(self,string):
+        self.out.WriteText(string)
+    
+class Printer(object):
+    def __init__(self, data):
+        sys.stdout.write("\r\x1b[K"+data.__str__())
+        #sys.stdout.flush()
     
 def isDicom(filename):
     try:
@@ -330,10 +376,9 @@ def isDicom(filename):
     
 if __name__ == "__main__":
     
-    for tag in _dicom_dict.DicomDictionary.items():
+    for tag in res.DicomDictionary.items():
         groupID = tag[0][2:6]
         if groupID == "0010":
-            print tag[1][2]
             EditTags.tagList.append(tag[1][2])
     
     app = wx.App(0)
