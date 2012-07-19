@@ -168,7 +168,7 @@ class FileSelection(wx.Panel):
 class EditTags(wx.Panel):
     
     patients    = {}
-    checkedTags = {}
+    changedTags = {}
     tagList     = []
     currentTags = []
     
@@ -176,39 +176,39 @@ class EditTags(wx.Panel):
         wx.Panel.__init__(self, parent)
         global baseTags
         
-        baseFrame       = parent
+        baseFrame = parent
         
         # Sizers
-        self.container  = wx.BoxSizer(wx.VERTICAL)
-        self.vboxA      = wx.BoxSizer(wx.VERTICAL)
-        self.hboxA1     = wx.BoxSizer(wx.HORIZONTAL)
-        self.hboxB      = wx.BoxSizer(wx.HORIZONTAL)
-        self.vboxB1     = wx.BoxSizer(wx.VERTICAL)
-        self.vboxC      = wx.BoxSizer(wx.VERTICAL)
-        self.hboxC1     = wx.BoxSizer(wx.HORIZONTAL)
+        self.container = wx.BoxSizer(wx.VERTICAL)
+        self.vboxA = wx.BoxSizer(wx.VERTICAL)
+        self.hboxA1 = wx.BoxSizer(wx.HORIZONTAL)
+        self.hboxB = wx.BoxSizer(wx.HORIZONTAL)
+        self.vboxB1 = wx.BoxSizer(wx.VERTICAL)
+        self.vboxC = wx.BoxSizer(wx.VERTICAL)
+        self.hboxC1 = wx.BoxSizer(wx.HORIZONTAL)
+        self.hboxC2 = wx.BoxSizer(wx.HORIZONTAL)
         
         # Buttons
-        self.editBtn    = wx.Button(self, 0, "Edit Tag", size=(185,25))
+        self.editBtn = wx.Button(self, 0, "Edit Tag", size=(185,25))
+        self.removeBtn = wx.Button(self, 0, "Remove Tag", size=(185,25))
         
         # Checkbox
-        self.privateCheck   = wx.CheckBox(self, 0, "Remove Private Tags")
+        self.privateCheck = wx.CheckBox(self, 0, "Remove Private Tags")
         
         # Combo
-        self.tagDrop        = wx.ComboBox(self, 0, size=(790, 25), choices=res.tagGroups, style=wx.CB_READONLY)
-        self.patientDrop    = wx.ComboBox(self, 0, size=(600, 25), choices=['Patients List'], style=wx.CB_READONLY)
-        
-        # Check List Box
-        self.tagCLBox   = wx.CheckListBox(self, 0, size=(395,255), choices=sorted(EditTags.tagList), style=0)
-        
+        self.tagDrop = wx.ComboBox(self, 0, size=(790, 25), choices=res.tagGroups, style=wx.CB_READONLY)
+        self.patientDrop = wx.ComboBox(self, 0, size=(600, 25), choices=['Patients List'], style=wx.CB_READONLY)
+    
         # Text Ctrl
         self.editTc = wx.TextCtrl(self, 0, 'Input field for new Tag value', size=(600,25))
-        self.tagTc  = wx.TextCtrl(self, 0, 'Select a Tag to edit it', size=(790,25), style=wx.TE_READONLY)
+        self.tagTc = wx.TextCtrl(self, 0, 'Select a Tag to edit it', size=(600,25), style=wx.TE_READONLY)
         
         # List Box
-        self.changesLBox    = wx.ListBox(self, 0, size=(395,255), style=wx.TE_MULTILINE)
+        self.changesLBox = wx.ListBox(self, 0, size=(395,255), style=wx.TE_MULTILINE)
+        self.tagLBox = wx.ListBox(self, 0, size=(395,255), choices=sorted(EditTags.tagList), style=wx.TE_MULTILINE)
         
         # Line
-        self.line1  = wx.StaticLine(self, 0, size=(800,1))
+        self.line1 = wx.StaticLine(self, 0, size=(800,1))
         
         # Layout
         self.container.AddSpacer((1,5))
@@ -223,22 +223,25 @@ class EditTags(wx.Panel):
         self.hboxA1.Add(self.privateCheck, 0, wx.LEFT, 25)
         self.vboxA.Add(self.tagDrop, 0, wx.LEFT, 5)
         
-        self.hboxB.Add(self.tagCLBox)
+        self.hboxB.Add(self.tagLBox)
         self.hboxB.Add(self.vboxB1)
         self.vboxB1.Add(self.changesLBox)
         
-        self.vboxC.Add(self.tagTc)
-        self.vboxC.AddSpacer((1,5))
         self.vboxC.Add(self.hboxC1)
-        self.hboxC1.Add(self.editTc)
-        self.hboxC1.Add(self.editBtn, 0, wx.LEFT, 5)
+        self.hboxC1.Add(self.tagTc)
+        self.hboxC1.Add(self.removeBtn, 0, wx.LEFT, 5)
+        self.vboxC.AddSpacer((1,5))
+        self.vboxC.Add(self.hboxC2)
+        self.hboxC2.Add(self.editTc)
+        self.hboxC2.Add(self.editBtn, 0, wx.LEFT, 5)
         
         # Bindings
         self.editBtn.Bind(wx.EVT_BUTTON, self.editTag)
-        self.tagCLBox.Bind(wx.EVT_CHECKLISTBOX, self.checkTag)
-        self.tagCLBox.Bind(wx.EVT_LISTBOX, self.checkTag)
         self.tagDrop.Bind(wx.EVT_COMBOBOX, self.setTagGroup)
         self.patientDrop.Bind(wx.EVT_COMBOBOX, self.setPatient)
+        self.tagLBox.Bind(wx.EVT_LISTBOX, self.tagSelected)
+        self.changesLBox.Bind(wx.EVT_LISTBOX, self.changeSelected)
+        self.removeBtn.Bind(wx.EVT_BUTTON, self.removeEdit)
         
         # Initialization
         self.SetSizer(self.container)
@@ -248,35 +251,63 @@ class EditTags(wx.Panel):
         
         
     # Handlers
-    def editTag(self, event):
-        print "Edit Button"
-        
-    def checkTag(self, event):
-        self.id     = event.GetSelection()
-        self.tag    = self.tagCLBox.GetString(self.id)
-        
-        if self.tagCLBox.IsChecked(self.id):
-            self.tagCLBox.Check(self.id, 0)
-            del EditTags.checkedTags[self.tag]
-        else:
-            self.tagCLBox.Check(self.id)
-            EditTags.checkedTags[self.tag] = ''
-            
     def setTagGroup(self, event):
-        self.group      = self.tagDrop.GetValue()[:4]
-        self.checked    = self.tagCLBox.GetChecked()
-        
+        self.group = self.tagDrop.GetValue()[:4]
         EditTags.tagList = []
         
-        self.tagCLBox.Clear()
+        self.tagLBox.Clear()
         
-        for tag in _dicom_dict.DicomDictionary.items():
+        for tag in res.DicomDictionary.items():
             groupID = tag[0][2:6]
             if groupID == self.group:
                 EditTags.tagList.append(tag[1][2])
         
-        self.tagCLBox.InsertItems(items=sorted(EditTags.tagList), pos=0)
+        self.tagLBox.InsertItems(items=sorted(EditTags.tagList), pos=0)
+    
+    def editTag(self, event):
+        self.newValue = self.editTc.GetValue()
+        self.tagName = self.tagTc.GetValue()
         
+        self.changesLBox.Clear()
+        
+        EditTags.changedTags[self.tagName] = self.newValue
+        
+        for pair in EditTags.changedTags.items():
+            self.insertValue = pair[0] + " => " + pair[1]
+            self.changesLBox.Insert(item=self.insertValue, pos=0)
+            
+    def removeEdit(self, event):
+        self.id = event.GetSelection()
+        self.tagName = self.tagTc.GetValue()
+        
+        del EditTags.changedTags[self.tagName]
+        
+        self.changesLBox.Clear()
+        
+        for pair in EditTags.changedTags.items():
+            self.insertValue = pair[0] + " => " + pair[1]
+            self.changesLBox.Insert(item=self.insertValue, pos=0)
+        
+        
+    def tagSelected(self, event):
+        self.id = event.GetSelection()
+        self.selectedTag = self.tagLBox.GetString(self.id)
+        
+        self.tagTc.SetValue(self.selectedTag)
+        
+        if self.selectedTag not in self.changedTags.keys():
+            self.editTc.SetValue("")
+        else:
+            self.editTc.SetValue(EditTags.changedTags[self.selectedTag])
+            
+    def changeSelected(self, event):
+        self.id = event.GetSelection()
+        self.selectedTag = self.changesLBox.GetString(self.id)
+        self.tagName = self.selectedTag.split(" => ")[0]
+        self.tagValue = self.selectedTag.split(" => ")[1]
+        
+        self.tagTc.SetValue(self.tagName)
+        self.editTc.SetValue(self.tagValue)
         
     def setPatient(self, event):
         pass
